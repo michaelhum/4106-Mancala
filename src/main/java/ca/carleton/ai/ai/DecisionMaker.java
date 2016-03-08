@@ -19,7 +19,7 @@ public class DecisionMaker {
     }
 
     public static Move determineMove(final Player player, final Board board) {
-        final MoveStrategy strategy = strategyFactory.getMove(player, board);
+        final MoveStrategy strategy = strategyFactory.getMoveStrategy(player);
         return strategy.getMove(player, board);
     }
 

@@ -27,6 +27,12 @@ public class House {
         this.isEdgeHouse = true;
     }
 
+    public House(final House old) {
+        this.player = old.player;
+        this.seeds = old.seeds;
+        this.isEdgeHouse = old.isEdgeHouse();
+    }
+
     public boolean isEmpty() {
         return this.seeds == 0;
     }

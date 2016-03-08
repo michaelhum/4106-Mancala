@@ -102,9 +102,12 @@ public class Game {
             while (!board.isGameOver()) {
                 final Player nextPlayer = board.getNextPlayer();
                 final Move nextMove = DecisionMaker.determineMove(nextPlayer, board);
-                board.applyMove(nextMove);
+                board.applyMove(nextMove, true);
                 LOG.info("\n{}", board);
             }
+        } catch (final StackOverflowError error) {
+            LOG.error("Stack overflow!", error);
+            System.exit(-1);
         } catch (final Exception exception) {
             LOG.error("Error during game.", exception);
             System.exit(-1);

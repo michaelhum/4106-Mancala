@@ -39,15 +39,36 @@ public class Board {
         this.players = new ArrayList<>();
     }
 
+    public Board(final Board old) {
+        this.numberOfHouses = old.numberOfHouses;
+        this.players = new ArrayList<>(old.players);
+
+        this.playerOneKalah = new House(old.getPlayerOneKalah());
+        this.playerTwoKalah = new House(old.getPlayerTwoKalah());
+
+        this.playerOneHouses = new House[this.numberOfHouses];
+        this.playerTwoHouses = new House[this.numberOfHouses];
+
+        for (int i = 0; i < this.numberOfHouses; i++) {
+            this.playerOneHouses[i] = new House(old.playerOneHouses[i]);
+            this.playerTwoHouses[i] = new House(old.playerTwoHouses[i]);
+        }
+
+    }
+
     // Apply a move and modify players to set next player.
-    public void applyMove(final Move move) {
+    public void applyMove(final Move move, final boolean log) {
 
         if (move == null) {
-            LOG.warn("No move given - skipping.");
+            if (log) {
+                LOG.warn("No move given - skipping.");
+            }
             return;
         }
         if (move.getHouseIndex() < 0 || move.getHouseIndex() > this.numberOfHouses - 1) {
-            LOG.warn("Invalid move index - skipping.");
+            if (log) {
+                LOG.warn("Invalid move index - skipping.");
+            }
             this.players.add(move.getPlayer());
             return;
         }
@@ -73,45 +94,57 @@ public class Board {
                 // If we drop last seed into player kalah we go again.
                 if (move.getPlayer() == Player.COMPUTER_ONE && current.isEdgeHouse()) {
                     this.players.add(0, this.getPlayerOne());
-                    LOG.info("Last seed dropped into kalah - another turn given.");
+                    if (log) {
+                        LOG.info("Last seed dropped into kalah - another turn given.");
+                    }
                 } else if (move.getPlayer() != Player.COMPUTER_ONE && current.isEdgeHouse()) {
                     this.players.add(0, this.getPlayerTwo());
-                    LOG.info("Last seed dropped into kalah - another turn given.");
+                    if (log) {
+                        LOG.info("Last seed dropped into kalah - another turn given.");
+                    }
                 } else {
                     // Add them to the end to go after.
                     this.players.add(move.getPlayer());
                 }
                 // If we drop last seed into an empty house (well, there is 1 now), we get all the seeds from the other house.
                 if (current.getSeeds() == 1 && !current.isEdgeHouse()) {
-                    final int oppositeIndex = startIndex - 1;
+                    try {
+                        final int oppositeIndex = startIndex - 1;
 
-                    final House[] copy;
-                    if (move.getPlayer() == Player.COMPUTER_ONE) {
-                        copy = this.playerTwoHouses.clone();
-                    } else {
-                        copy = this.playerOneHouses.clone();
-                    }
+                        final House[] copy;
+                        if (move.getPlayer() == Player.COMPUTER_ONE) {
+                            copy = this.playerTwoHouses.clone();
+                        } else {
+                            copy = this.playerOneHouses.clone();
+                        }
 
-                    final House opposite = copy[oppositeIndex];
-                    if (move.getPlayer() == Player.COMPUTER_ONE) {
-                        this.playerOneKalah.takeSeedsFrom(opposite);
-                    } else {
-                        this.playerTwoKalah.takeSeedsFrom(opposite);
+                        final House opposite = copy[oppositeIndex];
+                        if (move.getPlayer() == Player.COMPUTER_ONE) {
+                            this.playerOneKalah.takeSeedsFrom(opposite);
+                        } else {
+                            this.playerTwoKalah.takeSeedsFrom(opposite);
+                        }
+                        if (log) {
+                            LOG.info(
+                                    "Last seed dropped into empty house - seeds taken from opposite house. (Landed on house {}. Taken from opponent house {})",
+                                    startIndex,
+                                    oppositeIndex);
+                        }
+                    } catch (final Exception exception) {
+                        if (log) {
+                            LOG.trace("Error with 'dropping last seed into empty house' scenario!", exception);
+                        }
                     }
-                    LOG.info(
-                            "Last seed dropped into empty house - seeds taken from opposite house. (Landed on house {}. Taken from opponent house {})",
-                            startIndex,
-                            oppositeIndex);
                 }
             }
         }
         // Special case - add them anyway even if their move did nothing.
-        if (numberOfSeeds == 0) {
+        if (numberOfSeeds == 0 && log) {
             this.players.add(move.getPlayer());
         }
     }
 
-    private House[] getHouses(final boolean playerOne) {
+    public House[] getHouses(final boolean playerOne) {
         final House[] houses = new House[(this.numberOfHouses * 2) + 1];
         int i = 0;
         if (playerOne) {
@@ -199,14 +232,6 @@ public class Board {
         return this.playerTwoKalah.getPlayer();
     }
 
-    public boolean isEnablePruning() {
-        return this.enablePruning;
-    }
-
-    public void setEnablePruning(final boolean enablePruning) {
-        this.enablePruning = enablePruning;
-    }
-
     public int getNumberOfHouses() {
         return this.numberOfHouses;
     }
@@ -256,4 +281,19 @@ public class Board {
         return builder.toString();
     }
 
+    public int getPlayerOneHouseValue() {
+        int value = 0;
+        for (final House house : this.getPlayerOneHouses()) {
+            value += house.getSeeds();
+        }
+        return value;
+    }
+
+    public int getPlayerTwoHouseValue() {
+        int value = 0;
+        for (final House house : this.getPlayerTwoHouses()) {
+            value += house.getSeeds();
+        }
+        return value;
+    }
 }

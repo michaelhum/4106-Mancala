@@ -1,7 +1,6 @@
 package ca.carleton.ai.ai.strategy;
 
 import ca.carleton.ai.Player;
-import ca.carleton.ai.board.Board;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,9 +19,9 @@ public class MoveStrategyFactory {
         this.strategies.add(new MinimaxStrategy(maxDepth));
     }
 
-    public MoveStrategy getMove(final Player player, final Board board) {
+    public MoveStrategy getMoveStrategy(final Player player) {
         for (final MoveStrategy strategy : this.strategies)
-            if (strategy.appliesTo(player, board.isEnablePruning())) {
+            if (strategy.appliesTo(player, true)) {
                 return strategy;
             }
         throw new IllegalStateException("No strategy found for decision maker.");

@@ -7,6 +7,6 @@ package ca.carleton.ai.ai.strategy.heuristic;
  */
 public enum Heuristic {
 
-    MAXIMUM_POINTS,
-    MAXIMUM_TURNS
+    MINIMUM_DIFFERENCE,
+    MAXIMUM_SEEDS
 }

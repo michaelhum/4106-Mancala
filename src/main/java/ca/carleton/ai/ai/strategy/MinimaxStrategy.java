@@ -5,6 +5,8 @@ import ca.carleton.ai.ai.Move;
 import ca.carleton.ai.ai.strategy.heuristic.Heuristic;
 import ca.carleton.ai.board.Board;
 import ca.carleton.ai.board.House;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +17,8 @@ import java.util.List;
  * Created by Mike on 3/7/2016.
  */
 public class MinimaxStrategy implements MoveStrategy {
+
+    private static final Logger LOG = LoggerFactory.getLogger(MinimaxStrategy.class);
 
     private final int maxDepth;
 
@@ -43,16 +47,15 @@ public class MinimaxStrategy implements MoveStrategy {
         }
 
         final Heuristic heuristic;
-        // TODO heuristic
         if (player == Player.COMPUTER_ONE) {
-            heuristic = Heuristic.MAXIMUM_POINTS;
+            heuristic = Heuristic.MINIMUM_DIFFERENCE;
         } else {
-            heuristic = Heuristic.MAXIMUM_TURNS;
+            heuristic = Heuristic.MAXIMUM_SEEDS;
         }
 
         for (int i = 0; i < board.getNumberOfHouses(); i++) {
             if (!houses[i].isEmpty()) {
-                final MinimaxThread thread = new MinimaxThread(board, i, heuristic);
+                final MinimaxThread thread = new MinimaxThread(player, new Board(board), i, heuristic);
                 threads.add(thread);
                 thread.start();
             }
@@ -72,6 +75,8 @@ public class MinimaxStrategy implements MoveStrategy {
             }
         }
 
+        LOG.info("Selected move is house index {}. Results for search: Node count {}", bestIndex, nodeCount);
+
         return new Move(player, bestIndex);
     }
 
@@ -84,10 +89,15 @@ public class MinimaxStrategy implements MoveStrategy {
 
         private final Heuristic heuristic;
 
-        public MinimaxThread(final Board board, final int firstIndex, final Heuristic heuristic) {
+        private final Player player;
+
+        private int currentLevel;
+
+        public MinimaxThread(final Player player, final Board board, final int firstIndex, final Heuristic heuristic) {
             this.board = board;
             this.firstHouse = firstIndex;
             this.heuristic = heuristic;
+            this.player = player;
         }
 
         public int getFirstHouse() {
@@ -99,28 +109,123 @@ public class MinimaxStrategy implements MoveStrategy {
         }
 
         public void run() {
-            this.moveValue = new MoveFinder(this.board).findMove(this.firstHouse, this.heuristic);
-        }
-    }
-
-    private class MoveFinder {
-
-        private final Board board;
-
-        public MoveFinder(final Board board) {
-            this.board = board;
+            this.moveValue = new MoveFinder(this.board, this.player, false).findMove(this.firstHouse, this.heuristic);
         }
 
-        public int findMove(final int startIndex, final Heuristic heuristic) {
+        private class MoveFinder {
 
-            int depth = 0;
+            private final Board board;
 
+            private final Player player;
 
-            if (depth >= maxDepth) {
-                // TODO.
+            private boolean gameOver;
+
+            private boolean isPlayerTurn;
+
+            public MoveFinder(final Board board, final Player player, final boolean isPlayerTurn) {
+                this.board = board;
+                this.player = player;
+                this.isPlayerTurn = isPlayerTurn;
+                nodeCount++;
             }
 
-            return 0;
+            public int findMove(final int startIndex, final Heuristic heuristic) {
+
+                try {
+                    this.moveSeeds(startIndex);
+                } catch (final Exception ignored) {
+                }
+
+                if (this.gameOver || MinimaxThread.this.currentLevel >= MinimaxStrategy.this.maxDepth) {
+
+                    if (MinimaxThread.this.currentLevel >= MinimaxStrategy.this.maxDepth) {
+                        LOG.trace("Maximum depth reached or game over found.");
+                    }
+
+                    // Return heuristic value.
+                    if (heuristic == Heuristic.MINIMUM_DIFFERENCE) {
+                        if (this.isPlayerTurn) {
+                            if (this.player == Player.COMPUTER_ONE) {
+                                return this.board.getPlayerTwoKalah().getSeeds() - this.board.getPlayerOneKalah()
+                                        .getSeeds();
+                            } else {
+                                return this.board.getPlayerOneKalah().getSeeds() - this.board.getPlayerTwoKalah()
+                                        .getSeeds();
+                            }
+                        } else {
+                            if (this.player == Player.COMPUTER_ONE) {
+                                return this.board.getPlayerOneKalah().getSeeds() - this.board.getPlayerTwoKalah()
+                                        .getSeeds();
+                            } else {
+                                return this.board.getPlayerTwoKalah().getSeeds() - this.board.getPlayerOneKalah()
+                                        .getSeeds();
+                            }
+                        }
+                    } else {
+                        if (this.isPlayerTurn) {
+                            if (this.player == Player.COMPUTER_ONE) {
+                                return this.board.getPlayerOneHouseValue();
+                            } else {
+                                return -this.board.getPlayerTwoHouseValue();
+                            }
+                        } else {
+                            if (this.player == Player.COMPUTER_ONE) {
+                                return -this.board.getPlayerTwoHouseValue();
+                            } else {
+                                return this.board.getPlayerOneHouseValue();
+                            }
+                        }
+                    }
+                }
+
+                final House[] houses;
+                if (this.isPlayerTurn) {
+                    if (this.player == Player.COMPUTER_ONE) {
+                        houses = this.board.getPlayerOneHouses();
+                    } else {
+                        houses = this.board.getPlayerTwoHouses();
+                    }
+                } else {
+                    if (this.player == Player.COMPUTER_ONE) {
+                        houses = this.board.getPlayerTwoHouses();
+                    } else {
+                        houses = this.board.getPlayerOneHouses();
+                    }
+                }
+
+                int bestMove = Integer.MAX_VALUE;
+                MinimaxThread.this.currentLevel++;
+                for (int i = 0; i < houses.length; i++) {
+                    final int moveValue = new MoveFinder(new Board(this.board), this.player, !this.isPlayerTurn)
+                            .findMove(i, heuristic);
+                    if (moveValue < bestMove) {
+                        bestMove = moveValue;
+                    }
+                }
+
+                return bestMove;
+            }
+
+            private void moveSeeds(final int startIndex) {
+                final House[] houses = this.player == Player.COMPUTER_ONE ? this.board.getPlayerOneHouses() : this.board
+                        .getPlayerTwoHouses();
+
+                if (startIndex > -1 && startIndex < houses.length) {
+                    final House selected = houses[startIndex];
+                    if (!selected.isEmpty()) {
+                        this.board.applyMove(new Move(this.player, startIndex), false);
+                    } else {
+                        return;
+                    }
+                }
+
+                this.isPlayerTurn = !this.isPlayerTurn;
+
+                if (this.board.isGameOver()) {
+                    this.gameOver = true;
+                }
+
+            }
         }
     }
 }
